@@ -660,6 +660,18 @@ int dl_runtime_exceeded(struct rq *rq, struct sched_dl_entity *dl_se)
 
 extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
 
+u64 grub_reclaim(u64 delta, struct root_domain *rd, u64 u)
+{
+	u64 delta_exec1, delta_exec2;
+	unsigned int m = cpumask_weight(rd->span);
+
+	delta_exec1 = (delta * u) >> 20;
+	delta_exec2 = (delta * div64_long(rd->running_bw + (m - 1) * rd->max_bw, m)) >> 20;
+	if (delta_exec1 > delta_exec2) return delta_exec2;
+
+	return delta_exec1;
+}
+
 /*
  * Update the current task's runtime statistics (provided it is still
  * a -deadline task and has not been removed from the dl_rq).
@@ -696,6 +708,7 @@ static void update_curr_dl(struct rq *rq)
 
 	sched_rt_avg_update(rq, delta_exec);
 
+	delta_exec = grub_reclaim(delta_exec, rq->rd, curr->dl.dl_bw);
 	dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	if (dl_runtime_exceeded(rq, dl_se)) {
 		__dequeue_task_dl(rq, curr, 0);

@@ -530,6 +530,7 @@ struct root_domain {
 	 * "Inactive"
 	 */
 	s64 running_bw;
+	s64 max_bw;
 };
 
 extern struct root_domain def_root_domain;
