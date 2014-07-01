@@ -5659,6 +5659,9 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 static int init_rootdomain(struct root_domain *rd)
 {
 	memset(rd, 0, sizeof(*rd));
+#ifdef CONFIG_PARALLEL_RECLAIMING
+	rd->max_bw = (7 << 20) / 10;;	// FIXME: Check this... 70%???
+#endif
 
 	if (!alloc_cpumask_var(&rd->span, GFP_KERNEL))
 		goto out;

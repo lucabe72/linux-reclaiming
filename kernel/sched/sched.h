@@ -538,6 +538,7 @@ struct root_domain {
 	 * "Inactive"
 	 */
 	s32 running_bw;
+	s32 max_bw;
 #endif
 };
 
