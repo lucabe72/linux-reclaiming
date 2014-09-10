@@ -491,6 +491,10 @@ struct dl_rq {
 	 * "Inactive"
 	 */
 	s64 running_bw;
+
+	/* This the fraction of "CPU utilization" that GRUB can reclaim
+	 */
+	u8  reusable_bw_inv;
 };
 
 #ifdef CONFIG_SMP
