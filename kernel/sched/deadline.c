@@ -766,6 +766,7 @@ static void update_curr_dl(struct rq *rq)
 	sched_rt_avg_update(rq, delta_exec);
 
 	dl_se->runtime -= delta_exec;
+	trace_sched_stat_params_dl(curr, dl_se->runtime, dl_se->deadline);
 
 throttle:
 	if (dl_runtime_exceeded(dl_se) || dl_se->dl_yielded) {
@@ -985,6 +986,7 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	}
 
 	enqueue_dl_entity(&p->dl, pi_se, flags);
+	trace_sched_stat_params_dl(p, p->dl.runtime, p->dl.deadline);
 
 	if (!task_current(rq, p) && p->nr_cpus_allowed > 1)
 		enqueue_pushable_dl_task(rq, p);
