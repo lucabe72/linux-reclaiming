@@ -435,6 +435,35 @@ DEFINE_EVENT(sched_stat_running_bw, sched_stat_running_bw_add,
 DEFINE_EVENT(sched_stat_running_bw, sched_stat_running_bw_clear,
 	     TP_PROTO(struct task_struct *tsk, u64 tsk_bw, u64 running_bw),
 	     TP_ARGS(tsk, tsk_bw, running_bw));
+/*
+ * Tracepoint for showing actual parameters of SCHED_DEADLINE
+ * tasks.
+ */
+TRACE_EVENT(sched_stat_params_dl,
+
+	TP_PROTO(struct task_struct *tsk, s64 runtime, u64 deadline),
+
+	TP_ARGS(tsk, runtime, deadline),
+
+	TP_STRUCT__entry(
+		__array( char,	comm,	TASK_COMM_LEN	)
+		__field( pid_t,	pid			)
+		__field( s64,	runtime			)
+		__field( u64,	deadline		)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, tsk->comm, TASK_COMM_LEN);
+		__entry->pid		= tsk->pid;
+		__entry->runtime	= runtime;
+		__entry->deadline	= deadline;
+	),
+
+	TP_printk("comm=%s pid=%d runtime=%Ld [ns] deadline=%Lu",
+			__entry->comm, __entry->pid,
+			__entry->runtime, __entry->deadline)
+);
+
 
 /*
  * Tracepoint for showing priority inheritance modifying a tasks
