@@ -719,6 +719,7 @@ static void update_curr_dl(struct rq *rq)
 	} else {
 		dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	}
+	trace_sched_stat_params_dl(curr, dl_se->runtime, dl_se->deadline);
 	if (dl_runtime_exceeded(rq, dl_se)) {
 		dl_se->dl_throttled = 1;
 		__dequeue_task_dl(rq, curr, 0);
@@ -1024,6 +1025,7 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	}
 
 	enqueue_dl_entity(&p->dl, pi_se, flags);
+	trace_sched_stat_params_dl(p, p->dl.runtime, p->dl.deadline);
 
 	if (!task_current(rq, p) && p->nr_cpus_allowed > 1)
 		enqueue_pushable_dl_task(rq, p);
