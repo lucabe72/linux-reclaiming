@@ -708,7 +708,9 @@ static void update_curr_dl(struct rq *rq)
 
 	sched_rt_avg_update(rq, delta_exec);
 
-	delta_exec = grub_reclaim(delta_exec, rq->rd, curr->dl.dl_bw);
+	if (unlikely(dl_se->flags & SCHED_FLAG_RECLAIM)) {
+		delta_exec = grub_reclaim(delta_exec, rq->rd, curr->dl.dl_bw);
+	}
 	dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	if (dl_runtime_exceeded(rq, dl_se)) {
 		__dequeue_task_dl(rq, curr, 0);
