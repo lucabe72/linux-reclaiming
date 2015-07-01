@@ -667,9 +667,9 @@ u64 grub_reclaim(u64 delta, struct root_domain *rd, u64 u)
 
 	delta_exec1 = div64_long(delta * u, rd->max_bw);
 	delta_exec2 = (delta * div64_long(rd->running_bw + (m - 1) * rd->max_bw, m)) >> 20;
-	if (delta_exec1 > delta_exec2) return delta_exec2;
+	if (delta_exec1 > delta_exec2) return delta_exec1;
 
-	return delta_exec1;
+	return delta_exec2;
 }
 
 /*
