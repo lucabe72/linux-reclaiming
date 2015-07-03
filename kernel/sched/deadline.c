@@ -161,7 +161,7 @@ void init_dl_rq(struct dl_rq *dl_rq, struct rq *rq)
 #else
 	init_dl_bw(&dl_rq->dl_bw);
 #endif
-	dl_rq->reusable_bw_inv = (10 << 4) / 9;		// FIXME: allow to set this!
+	dl_rq->unusable_bw = (1 << 20) / 10;		// FIXME: allow to set this!
 }
 
 #ifdef CONFIG_SMP
@@ -700,7 +700,7 @@ static void update_curr_dl(struct rq *rq)
 	sched_rt_avg_update(rq, delta_exec);
 
 	if (unlikely(dl_se->flags & SCHED_FLAG_RECLAIM)) {
-		dl_se->runtime -= dl_se->dl_yielded ? 0 : (delta_exec * rq->dl.running_bw * rq->dl.reusable_bw_inv) >> 20 >> 4;
+		dl_se->runtime -= dl_se->dl_yielded ? 0 : (delta_exec * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
 	} else {
 		dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	}
