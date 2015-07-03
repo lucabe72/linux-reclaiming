@@ -495,6 +495,8 @@ struct dl_rq {
 	/* This the fraction of "CPU utilization" that GRUB can reclaim
 	 */
 	s64 unusable_bw;
+
+	s64 this_bw;
 };
 
 #ifdef CONFIG_SMP
