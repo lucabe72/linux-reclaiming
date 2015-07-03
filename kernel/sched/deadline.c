@@ -830,9 +830,19 @@ extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
  * Since rq->dl.running_bw contains Uact * 2^20, the result
  * has to be shifted right by 20.
  */
-u64 grub_reclaim(u64 delta, struct rq *rq)
+u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * (rq->dl.non_deadline_bw + rq->dl.running_bw)) >> 20;
+	u64 u_act;
+
+	if (WARN_ON(rq->dl.this_bw < rq->dl.running_bw))
+		return delta;
+
+	if (rq->dl.this_bw - rq->dl.running_bw > (1 << 20) - u)
+		u_act = u;
+	else
+		u_act = (1 << 20) - rq->dl.this_bw + rq->dl.running_bw;
+
+	return (delta * u_act) >> 20;
 }
 
 /*
@@ -872,7 +882,7 @@ static void update_curr_dl(struct rq *rq)
 	sched_rt_avg_update(rq, delta_exec);
 
 	if (unlikely(dl_se->flags & SCHED_FLAG_RECLAIM))
-		delta_exec = grub_reclaim(delta_exec, rq);
+		delta_exec = grub_reclaim(delta_exec, rq, curr->dl.dl_bw);
 	dl_se->runtime -= dl_se->dl_yielded ? 0 : delta_exec;
 	trace_sched_stat_params_dl(curr, dl_se->runtime, dl_se->deadline);
 	if (dl_runtime_exceeded(dl_se)) {
