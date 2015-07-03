@@ -63,6 +63,22 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	if (dl_rq->running_bw < 0) dl_rq->running_bw = 0;
 }
 
+static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw -= se_bw;
+	WARN_ON(dl_rq->this_bw < 0);
+	if (dl_rq->this_bw < 0) dl_rq->this_bw = 0;
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw += se_bw;
+}
+
 static void task_go_inactive(struct task_struct *p)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
@@ -507,6 +523,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	if (dl_se->dl_new) {
 		setup_new_dl_entity(dl_se, pi_se);
 	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
+	        add_rq_bw(dl_se, dl_rq);	// FIXME! Check if this works
 		return;
 	}
 
@@ -665,7 +682,7 @@ extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
  
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
+	return (delta * ((1 << 20) - rq->dl.this_bw + rq->dl.running_bw)) >> 20;
 }
 
 /*
@@ -1271,6 +1288,7 @@ static void task_dead_dl(struct task_struct *p)
 	} else if (task_on_rq_queued(p)) {
 		clear_running_bw(&p->dl, &rq->dl);
 	}
+	clear_rq_bw(&p->dl, &rq->dl);
 }
 
 static void set_curr_task_dl(struct rq *rq)
@@ -1544,8 +1562,10 @@ retry:
 
 	deactivate_task(rq, next_task, 0);
 	clear_running_bw(&next_task->dl, &rq->dl);
+	clear_rq_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
 	add_running_bw(&next_task->dl, &later_rq->dl);
+	add_rq_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1633,8 +1653,10 @@ static int pull_dl_task(struct rq *this_rq)
 
 			deactivate_task(src_rq, p, 0);
 			clear_running_bw(&p->dl, &src_rq->dl);
+			clear_rq_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
 			add_running_bw(&p->dl, &this_rq->dl);
+			add_rq_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
@@ -1802,6 +1824,7 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	} else if (task_on_rq_queued(p)) {
 		clear_running_bw(&p->dl, &rq->dl);
 	}
+	clear_rq_bw(&p->dl, &rq->dl);
 
 	__dl_clear_params(p);
 	/*

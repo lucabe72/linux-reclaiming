@@ -496,6 +496,8 @@ struct dl_rq {
          * reclaim (per runqueue)  
          */
 	s64 unusable_bw;
+
+	s64 this_bw;
 };
 
 #ifdef CONFIG_SMP
