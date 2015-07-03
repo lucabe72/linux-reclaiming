@@ -61,6 +61,14 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	WARN_ON(rq->rd->running_bw < 0);
 	if (rq->rd->running_bw < 0) rq->rd->running_bw = 0;
 }
+
+static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
 #else
 static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
@@ -76,6 +84,22 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	dl_rq->running_bw -= se_bw;
 	WARN_ON(dl_rq->running_bw < 0);
 	if (dl_rq->running_bw < 0) dl_rq->running_bw = 0;
+}
+
+static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw -= se_bw;
+	WARN_ON(dl_rq->this_bw < 0);
+	if (dl_rq->this_bw < 0) dl_rq->this_bw = 0;
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw += se_bw;
 }
 #endif
 
@@ -524,6 +548,7 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	if (dl_se->dl_new) {
 		setup_new_dl_entity(dl_se, pi_se);
+	        add_rq_bw(dl_se, dl_rq);	// FIXME! Check if this works
 	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
 		return;
 	}
@@ -696,7 +721,24 @@ u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 #else
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
+	u64 u_act;
+
+	if(rq->dl.this_bw < rq->dl.running_bw) {
+		WARN_ON(1);
+		return delta;
+	}
+	if (rq->dl.this_bw - rq->dl.running_bw > (1 << 20) - u) {
+		u_act = u;
+	} else {
+		u_act = (1 << 20) - rq->dl.this_bw + rq->dl.running_bw;
+	}
+/*
+if (u_act != 1<< 20) {
+printk("T: %llu R: %llu\t(%llu)\t", rq->dl.this_bw, rq->dl.running_bw, delta);
+printk("\tInact: %llu (%llu)\n", u_act, (delta * u_act) >> 20);
+}
+*/
+	return (delta * u_act) >> 20;
 }
 #endif
 
@@ -1308,6 +1350,7 @@ static void task_dead_dl(struct task_struct *p)
 	} else if (task_on_rq_queued(p)) {
 		clear_running_bw(&p->dl, &rq->dl);
 	}
+	clear_rq_bw(&p->dl, &rq->dl);
 }
 
 static void set_curr_task_dl(struct rq *rq)
@@ -1582,9 +1625,11 @@ retry:
 	deactivate_task(rq, next_task, 0);
 #ifndef CONFIG_PARALLEL_RECLAIMING
 	clear_running_bw(&next_task->dl, &rq->dl);
+	clear_rq_bw(&next_task->dl, &rq->dl);
 #endif
 	set_task_cpu(next_task, later_rq->cpu);
 #ifndef CONFIG_PARALLEL_RECLAIMING
+	add_rq_bw(&next_task->dl, &later_rq->dl);
 	add_running_bw(&next_task->dl, &later_rq->dl);
 #endif
 	activate_task(later_rq, next_task, 0);
@@ -1675,9 +1720,11 @@ static int pull_dl_task(struct rq *this_rq)
 			deactivate_task(src_rq, p, 0);
 #ifndef CONFIG_PARALLEL_RECLAIMING
 			clear_running_bw(&p->dl, &src_rq->dl);
+			clear_rq_bw(&p->dl, &src_rq->dl);
 #endif
 			set_task_cpu(p, this_cpu);
 #ifndef CONFIG_PARALLEL_RECLAIMING
+			add_rq_bw(&p->dl, &this_rq->dl);
 			add_running_bw(&p->dl, &this_rq->dl);
 #endif
 			activate_task(this_rq, p, 0);
@@ -1848,6 +1895,7 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	} else if (task_on_rq_queued(p)) {
 		clear_running_bw(&p->dl, &rq->dl);
 	}
+	clear_rq_bw(&p->dl, &rq->dl);
 
 	__dl_clear_params(p);
 	/*
