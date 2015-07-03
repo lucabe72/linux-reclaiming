@@ -665,8 +665,8 @@ u64 grub_reclaim(u64 delta, struct root_domain *rd, u64 u)
 	u64 delta_exec1, delta_exec2;
 	unsigned int m = cpumask_weight(rd->span);
 
-	delta_exec1 = div64_long(delta * u, rd->max_bw);
-	delta_exec2 = (delta * div64_long(rd->running_bw + (m - 1) * rd->max_bw, m)) >> 20;
+	delta_exec1 = div64_long(delta * u, rd->dl_bw.bw);
+	delta_exec2 = div64_long(delta * ((m << 20) - rd->dl_bw.total_bw + rd->running_bw), m) >> 20;
 	if (delta_exec1 > delta_exec2) return delta_exec1;
 
 	return delta_exec2;
