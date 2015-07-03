@@ -820,7 +820,19 @@ extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
 
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
+	u64 u_act;
+
+	if(rq->dl.this_bw < rq->dl.running_bw) {
+		WARN_ON(1);
+		return delta;
+	}
+	if (rq->dl.this_bw - rq->dl.running_bw > (1 << 20) - u) {
+		u_act = u;
+	} else {
+		u_act = (1 << 20) - rq->dl.this_bw + rq->dl.running_bw;
+	}
+
+	return (delta * u_act) >> 20;
 }
 
 /*
