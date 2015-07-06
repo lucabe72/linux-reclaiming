@@ -491,6 +491,11 @@ struct dl_rq {
 	 * "Inactive"
 	 */
 	s64 running_bw;
+
+	/* This is the amount of utilization that GRUB can not
+         * reclaim (per runqueue)  
+         */
+	s64 unusable_bw;
 };
 
 #ifdef CONFIG_SMP
