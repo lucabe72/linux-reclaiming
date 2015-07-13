@@ -522,8 +522,8 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	 */
 	if (dl_se->dl_new) {
 		setup_new_dl_entity(dl_se, pi_se);
-	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
 	        add_rq_bw(dl_se, dl_rq);	// FIXME! Check if this works
+	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
 		return;
 	}
 
@@ -682,7 +682,24 @@ extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
  
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * ((1 << 20) - rq->dl.this_bw + rq->dl.running_bw)) >> 20;
+	u64 u_act;
+
+	if(rq->dl.this_bw < rq->dl.running_bw) {
+		WARN_ON(1);
+		return delta;
+	}
+	if (rq->dl.this_bw - rq->dl.running_bw > (1 << 20) - u) {
+		u_act = u;
+	} else {
+		u_act = (1 << 20) - rq->dl.this_bw + rq->dl.running_bw;
+	}
+/*
+if (u_act != 1<< 20) {
+printk("T: %llu R: %llu\t(%llu)\t", rq->dl.this_bw, rq->dl.running_bw, delta);
+printk("\tInact: %llu (%llu)\n", u_act, (delta * u_act) >> 20);
+}
+*/
+	return (delta * u_act) >> 20;
 }
 
 /*
@@ -1564,8 +1581,8 @@ retry:
 	clear_running_bw(&next_task->dl, &rq->dl);
 	clear_rq_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
-	add_running_bw(&next_task->dl, &later_rq->dl);
 	add_rq_bw(&next_task->dl, &later_rq->dl);
+	add_running_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1655,8 +1672,8 @@ static int pull_dl_task(struct rq *this_rq)
 			clear_running_bw(&p->dl, &src_rq->dl);
 			clear_rq_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
-			add_running_bw(&p->dl, &this_rq->dl);
 			add_rq_bw(&p->dl, &this_rq->dl);
+			add_running_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
