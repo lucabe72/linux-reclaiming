@@ -50,7 +50,9 @@ static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 	u64 se_bw = dl_se->dl_bw;
 
+	raw_spin_lock(&rq->rd->running_bw_lock);
 	rq->rd->running_bw += se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
 	trace_sched_stat_running_bw_add(dl_task_of(dl_se), se_bw, rq->rd->running_bw);
 }
 
@@ -59,7 +61,9 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 	u64 se_bw = dl_se->dl_bw;
 
+	raw_spin_lock(&rq->rd->running_bw_lock);
 	rq->rd->running_bw -= se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
 	trace_sched_stat_running_bw_clear(dl_task_of(dl_se), se_bw, rq->rd->running_bw);
 	WARN_ON(rq->rd->running_bw < 0);
 	if (rq->rd->running_bw < 0) rq->rd->running_bw = 0;
@@ -669,7 +673,7 @@ u64 grub_reclaim(u64 delta, struct root_domain *rd, u64 u)
 	u64 delta_exec1, delta_exec2;
 	unsigned int m = cpumask_weight(rd->span);
 
-	delta_exec1 = div64_long(delta * u, rd->dl_bw.bw);
+	delta_exec1 = (delta * u) >> 20;
 	delta_exec2 = div64_long(delta * ((m << 20) - rd->dl_bw.total_bw + rd->running_bw), m) >> 20;
 	if (delta_exec1 > delta_exec2) return delta_exec1;
 

@@ -530,6 +530,7 @@ struct root_domain {
 	 * "Inactive"
 	 */
 	s64 running_bw;
+	raw_spinlock_t running_bw_lock;
 	s64 max_bw;
 };
 
