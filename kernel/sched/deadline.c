@@ -49,7 +49,9 @@ static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 	u64 se_bw = dl_se->dl_bw;
 
+	raw_spin_lock(&rq->rd->running_bw_lock);
 	rq->rd->running_bw += se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
 }
 
 static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
@@ -57,7 +59,9 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 	u64 se_bw = dl_se->dl_bw;
 
+	raw_spin_lock(&rq->rd->running_bw_lock);
 	rq->rd->running_bw -= se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
 	WARN_ON(rq->rd->running_bw < 0);
 	if (rq->rd->running_bw < 0) rq->rd->running_bw = 0;
 }

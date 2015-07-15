@@ -544,6 +544,7 @@ struct root_domain {
 	 * "Inactive"
 	 */
 	s32 running_bw;
+	raw_spinlock_t running_bw_lock;
 	s32 max_bw;
 #endif
 };
