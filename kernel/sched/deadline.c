@@ -530,7 +530,6 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 	if (hrtimer_active(&dl_se->inactive_timer)) {
 		if (hrtimer_try_to_cancel(&dl_se->inactive_timer) < 0) {
 			printk("[%d]Task reactivating, but cannot cancel inactive timer...\n", task_cpu(dl_task_of(dl_se)));
-	        	add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
 		}
 	} else {
 	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
@@ -809,6 +808,11 @@ again:
 		goto unlock;
 	}
 
+	if (p->state == TASK_RUNNING) {
+		printk("Inactive task when task already activated... Should not be a problem!\n");
+		goto unlock1;
+	}
+
 	sched_clock_tick();
 	update_rq_clock(rq);
 	dl_se->dl_throttled = 0;
@@ -818,6 +822,7 @@ again:
 	}
 unlock:
 	clear_running_bw(dl_se, &rq->dl);		// FIXME! Check this... 
+unlock1:
 	raw_spin_unlock(&rq->lock);
 
 	return HRTIMER_NORESTART;
