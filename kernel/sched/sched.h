@@ -519,6 +519,8 @@ struct dl_rq {
 	struct rb_node *pushable_dl_tasks_leftmost;
 #else
 	struct dl_bw dl_bw;
+
+	s64 non_reclaimable_bw;
 #endif
 	/*
 	 * "Active utilization" for this runqueue: increased when a
@@ -526,6 +528,12 @@ struct dl_rq {
 	 * task blocks
 	 */
 	s64 running_bw;
+
+	/*
+	 * Fraction of the CPU utilization that cannot be reclaimed
+	 * by the GRUB algorithm.
+	 */
+	s64 non_deadline_bw;
 
 	s64 this_bw;
 };

@@ -5708,6 +5708,7 @@ static int init_rootdomain(struct root_domain *rd)
 		goto free_dlo_mask;
 
 	init_dl_bw(&rd->dl_bw);
+
 	if (cpudl_init(&rd->cpudl) != 0)
 		goto free_dlo_mask;
 
@@ -7939,8 +7940,11 @@ static void sched_dl_do_global(void)
 		raw_spin_lock_irqsave(&dl_b->lock, flags);
 		dl_b->bw = new_bw;
 		raw_spin_unlock_irqrestore(&dl_b->lock, flags);
-
 		rcu_read_unlock_sched();
+		if (dl_b->bw == -1)
+			cpu_rq(cpu)->dl.non_deadline_bw = 0;
+		else
+			cpu_rq(cpu)->dl.non_deadline_bw = (1 << 20) - new_bw;
 	}
 }
 
