@@ -177,6 +177,9 @@ void init_dl_rq(struct dl_rq *dl_rq, struct rq *rq)
 #else
 	init_dl_bw(&dl_rq->dl_bw);
 #endif
+#ifndef CONFIG_PARALLEL_RECLAIMING
+	dl_rq->unusable_bw = (1 << 20) / 10;		// FIXME: allow to set this!
+#endif
 }
 
 #ifdef CONFIG_SMP
@@ -693,7 +696,7 @@ u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 #else
 u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 {
-	return (delta * rq->dl.running_bw) >> 20;
+	return (delta * (rq->dl.unusable_bw + rq->dl.running_bw)) >> 20;
 }
 #endif
 
