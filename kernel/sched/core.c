@@ -1816,7 +1816,12 @@ void __dl_clear_params(struct task_struct *p)
 	dl_se->dl_bw = 0;
 
 	dl_se->dl_throttled = 0;
-	dl_se->dl_new = 1;
+        if (p->sched_class != &dl_sched_class) {
+		dl_se->dl_new = 1;
+		init_inactive_task_timer(dl_se);
+	} else {
+		dl_se->dl_new = 0;
+	}
 	dl_se->dl_yielded = 0;
 }
 

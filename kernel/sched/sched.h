@@ -485,6 +485,14 @@ struct dl_rq {
 #else
 	struct dl_bw dl_bw;
 #endif
+#ifndef CONFIG_PARALLEL_RECLAIMING
+	/* This is GRUB's "system utilization" for this runqueue...
+	 * Increased when a task passes from "Inactive" to "Active Contending"
+	 * and decreased when a task passes from "Active non Contending" to
+	 * "Inactive"
+	 */
+	s64 running_bw;
+#endif
 };
 
 #ifdef CONFIG_SMP
@@ -522,6 +530,15 @@ struct root_domain {
 	 */
 	cpumask_var_t rto_mask;
 	struct cpupri cpupri;
+#ifdef CONFIG_PARALLEL_RECLAIMING
+	/* This is GRUB's "system utilization" for this domain (global
+         * utilization) ...
+	 * Increased when a task passes from "Inactive" to "Active Contending"
+	 * and decreased when a task passes from "Active non Contending" to
+	 * "Inactive"
+	 */
+	s32 running_bw;
+#endif
 };
 
 extern struct root_domain def_root_domain;
@@ -1258,6 +1275,7 @@ extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime
 extern struct dl_bandwidth def_dl_bandwidth;
 extern void init_dl_bandwidth(struct dl_bandwidth *dl_b, u64 period, u64 runtime);
 extern void init_dl_task_timer(struct sched_dl_entity *dl_se);
+extern void init_inactive_task_timer(struct sched_dl_entity *dl_se);
 
 unsigned long to_ratio(u64 period, u64 runtime);
 
