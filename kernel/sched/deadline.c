@@ -77,6 +77,13 @@ static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
 }
+
+static void migrate_bw_from(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
+static void migrate_bw_to(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
 #else
 static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
@@ -110,6 +117,17 @@ static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	u64 se_bw = dl_se->dl_bw;
 
 	dl_rq->this_bw += se_bw;
+}
+
+static void migrate_bw_from(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	clear_running_bw(dl_se, dl_rq);
+	clear_rq_bw(dl_se, dl_rq);
+}
+static void migrate_bw_to(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	add_rq_bw(dl_se, dl_rq);
+	add_running_bw(dl_se, dl_rq);
 }
 #endif
 
@@ -1635,15 +1653,9 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
-#ifndef CONFIG_PARALLEL_RECLAIMING
-	clear_running_bw(&next_task->dl, &rq->dl);
-	clear_rq_bw(&next_task->dl, &rq->dl);
-#endif
+	migrate_bw_from(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
-#ifndef CONFIG_PARALLEL_RECLAIMING
-	add_rq_bw(&next_task->dl, &later_rq->dl);
-	add_running_bw(&next_task->dl, &later_rq->dl);
-#endif
+	migrate_bw_to(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1730,15 +1742,9 @@ static int pull_dl_task(struct rq *this_rq)
 			ret = 1;
 
 			deactivate_task(src_rq, p, 0);
-#ifndef CONFIG_PARALLEL_RECLAIMING
-			clear_running_bw(&p->dl, &src_rq->dl);
-			clear_rq_bw(&p->dl, &src_rq->dl);
-#endif
+			migrate_bw_from(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
-#ifndef CONFIG_PARALLEL_RECLAIMING
-			add_rq_bw(&p->dl, &this_rq->dl);
-			add_running_bw(&p->dl, &this_rq->dl);
-#endif
+			migrate_bw_to(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
