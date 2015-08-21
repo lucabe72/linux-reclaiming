@@ -142,6 +142,11 @@ static void task_go_inactive(struct task_struct *p)
 	s64 delta;
 	u64 zerolag_time;
 
+	if (hrtimer_active(&dl_se->inactive_timer)) {
+		printk("[%d] Task %d going inactive with inactive timer still armed!\n", task_cpu(p), p->pid);
+		printk("===> %lld\n", div64_long((dl_se->runtime * dl_se->dl_period), dl_se->dl_runtime));
+		return;
+	}
 	/*
 	 * If dl_runtime is 0, the task is not SCHED_DEADLINE anymore...
 	 * We have no way to compute a correct 0 lag time; just release
