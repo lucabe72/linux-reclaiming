@@ -1377,10 +1377,10 @@ static void task_dead_dl(struct task_struct *p)
 
 	hrtimer_cancel(timer);
 	if (hrtimer_active(&p->dl.inactive_timer)) {
-		if (hrtimer_cancel(&p->dl.inactive_timer) == 1) {
-			raw_spin_lock(&rq->lock);
+		if (hrtimer_try_to_cancel(&p->dl.inactive_timer) < 0) {
+			printk("Cannot cancel inactive timer!\n");
+		} else {
 			clear_running_bw(&p->dl, &rq->dl);
-			raw_spin_unlock(&rq->lock);
 		}
 	} else if (task_on_rq_queued(p)) {
 		clear_running_bw(&p->dl, &rq->dl);
