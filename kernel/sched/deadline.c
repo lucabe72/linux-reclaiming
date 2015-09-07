@@ -100,7 +100,13 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	dl_rq->running_bw -= se_bw;
 	trace_sched_stat_running_bw_clear(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
 	WARN_ON(dl_rq->running_bw < 0);
-	if (dl_rq->running_bw < 0) dl_rq->running_bw = 0;
+//	if (dl_rq->running_bw < 0) dl_rq->running_bw = 0;
+	if (dl_rq->running_bw < 0) {
+		struct task_struct *p = dl_task_of(dl_se);
+
+		dl_rq->running_bw = 0;
+		printk("[%d]%d: s%ld\n", task_cpu(p), p->pid, p->state);
+	}
 }
 
 static void clear_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
@@ -588,7 +594,8 @@ static void update_dl_entity(struct sched_dl_entity *dl_se,
 
 	if (hrtimer_active(&dl_se->inactive_timer)) {
 		if (hrtimer_try_to_cancel(&dl_se->inactive_timer) < 0) {
-			printk("[%d]Task reactivating, but cannot cancel inactive timer...\n", task_cpu(dl_task_of(dl_se)));
+//			printk("[%d]Task reactivating, but cannot cancel inactive timer...\n", task_cpu(dl_task_of(dl_se)));
+			printk("[%d]Task %d reactivating, but cannot cancel inactive timer... (%ld)\n", task_cpu(dl_task_of(dl_se)), dl_task_of(dl_se)->pid, dl_task_of(dl_se)->state);
 		}
 	} else {
 	        add_running_bw(dl_se, dl_rq);	// FIXME! Check if this works
@@ -867,7 +874,8 @@ again:
 	if (rq != task_rq(p)) {
 		/* Task was moved, retrying. */
 		raw_spin_unlock(&rq->lock);
-		printk("[%d]??? Non-ready task migrated???\n", task_cpu(p));
+//		printk("[%d]??? Non-ready task migrated???\n", task_cpu(p));
+		printk("[%d]??? Non-ready task %d migrated??? (%d) - %ld\n", task_cpu(p), p->pid, cpu_of(rq), p->state);
 		goto again;
 	}
 
@@ -883,7 +891,8 @@ again:
 	}
 
 	if (p->state == TASK_RUNNING) {
-		printk("Inactive task when task already activated... Should not be a problem!\n");
+//		printk("Inactive task when task already activated... Should not be a problem!\n");
+		printk("[%d] Inactive task %d when task already activated... Should not be a problem!\n", task_cpu(p), p->pid);
 		goto unlock1;
 	}
 
@@ -1377,7 +1386,7 @@ static void task_dead_dl(struct task_struct *p)
 
 	hrtimer_cancel(timer);
 	if (hrtimer_active(&p->dl.inactive_timer)) {
-		if (hrtimer_try_to_cancel(&p->dl.inactive_timer) < 0) {
+		if (hrtimer_try_to_cancel(&p->dl.inactive_timer) <= 0) {
 			printk("Cannot cancel inactive timer!\n");
 		} else {
 			clear_running_bw(&p->dl, &rq->dl);
@@ -1910,8 +1919,9 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	cancel_dl_timer(rq, p);
 
 	if (hrtimer_active(&p->dl.inactive_timer) && !dl_policy(p->policy)) {
-		if (hrtimer_try_to_cancel(&p->dl.inactive_timer) < 0) {
-			printk("Cannot cancel inactive timer!\n");
+		if (hrtimer_try_to_cancel(&p->dl.inactive_timer) <= 0) {
+//			printk("Cannot cancel inactive timer!\n");
+			printk("Switched from: Cannot cancel inactive timer!\n");
 		} else {
 			clear_running_bw(&p->dl, &rq->dl);
 		}
