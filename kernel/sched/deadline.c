@@ -1195,6 +1195,14 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 
 	rq = cpu_rq(cpu);
 
+	if (hrtimer_active(&p->dl.inactive_timer)) {
+		if (hrtimer_cancel(&p->dl.inactive_timer) == 1) {
+			raw_spin_lock(&rq->lock);
+			clear_running_bw(&p->dl, &rq->dl);
+			raw_spin_unlock(&rq->lock);
+		}
+	}
+
 	rcu_read_lock();
 	curr = READ_ONCE(rq->curr); /* unlocked access */
 
