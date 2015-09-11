@@ -1219,6 +1219,19 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 	}
 	rcu_read_unlock();
 
+	if (rq != cpu_rq(cpu)) {
+		if (hrtimer_active(&p->dl.inactive_timer)) {
+			raw_spin_lock(&rq->lock);
+			clear_running_bw(&p->dl, &rq->dl);
+			raw_spin_unlock(&rq->lock);
+			rq = cpu_rq(cpu);
+			raw_spin_lock(&rq->lock);
+			add_running_bw(&p->dl, &rq->dl);
+			raw_spin_unlock(&rq->lock);
+		}
+	}
+
+
 out:
 	return cpu;
 }
