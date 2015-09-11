@@ -901,8 +901,8 @@ again:
 
 	sched_clock_tick();
 	update_rq_clock(rq);
-	dl_se->dl_throttled = 0;
-	dl_se->dl_yielded = 0;
+	//dl_se->dl_throttled = 0;
+	//dl_se->dl_yielded = 0;
 	if (task_has_dl_policy(rq->curr)) {
 		update_curr_dl(rq);
 	}
