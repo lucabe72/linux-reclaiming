@@ -1196,13 +1196,20 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
 	struct task_struct *curr;
 	struct rq *rq;
-
-goto out;			// HACK!!!
+	int ocpu = cpu;
 
 	if (sd_flag != SD_BALANCE_WAKE)
 		goto out;
 
 	rq = cpu_rq(cpu);
+
+	if (hrtimer_active(&p->dl.inactive_timer)) {
+		if (hrtimer_cancel(&p->dl.inactive_timer) == 1) {
+			raw_spin_lock(&rq->lock);
+			clear_running_bw(&p->dl, &rq->dl);
+			raw_spin_unlock(&rq->lock);
+		}
+	}
 
 	rcu_read_lock();
 	curr = ACCESS_ONCE(rq->curr); /* unlocked access */
@@ -1226,6 +1233,15 @@ goto out;			// HACK!!!
 			cpu = target;
 	}
 	rcu_read_unlock();
+
+	if (cpu != ocpu) {
+		raw_spin_lock(&cpu_rq(ocpu)->lock);
+		clear_rq_bw(&p->dl, &rq->dl);
+		raw_spin_unlock(&cpu_rq(ocpu)->lock);
+		raw_spin_lock(&cpu_rq(cpu)->lock);
+		add_rq_bw(&p->dl, &cpu_rq(cpu)->dl);
+		raw_spin_unlock(&cpu_rq(cpu)->lock);
+	}
 
 out:
 	return cpu;
