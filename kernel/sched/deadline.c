@@ -89,6 +89,7 @@ static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
 	u64 se_bw = dl_se->dl_bw;
 
+	lockdep_assert_held(&(rq_of_dl_rq(dl_rq))->lock);
 	dl_rq->running_bw += se_bw;
 	trace_sched_stat_running_bw_add(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
 }
@@ -97,6 +98,7 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
 	u64 se_bw = dl_se->dl_bw;
 
+	lockdep_assert_held(&(rq_of_dl_rq(dl_rq))->lock);
 	dl_rq->running_bw -= se_bw;
 	trace_sched_stat_running_bw_clear(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
 	WARN_ON(dl_rq->running_bw < 0);
@@ -104,8 +106,9 @@ static void clear_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	if (dl_rq->running_bw < 0) {
 		struct task_struct *p = dl_task_of(dl_se);
 
-		dl_rq->running_bw = 0;
+		printk("%lld --- %llu\n", dl_rq->running_bw, se_bw);
 		printk("[%d]%d: s%ld\n", task_cpu(p), p->pid, p->state);
+		dl_rq->running_bw = 0;
 	}
 }
 
