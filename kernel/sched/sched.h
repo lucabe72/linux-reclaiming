@@ -525,6 +525,8 @@ struct dl_rq {
 	 * task blocks
 	 */
 	s64 running_bw;
+
+	s64 this_bw;
 };
 
 #ifdef CONFIG_SMP
