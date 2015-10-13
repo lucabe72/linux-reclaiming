@@ -75,6 +75,11 @@ static void task_go_inactive(struct task_struct *p)
 
 	WARN_ON(dl_se->dl_runtime == 0);
 
+	/* If the inactive timer is already armed, return immediately */
+	if (hrtimer_active(&dl_se->inactive_timer))
+		return;
+
+
 	/*
 	 * We want the timer to fire at the "0 lag time", but considering
 	 * that it is actually coming from rq->clock and not from
