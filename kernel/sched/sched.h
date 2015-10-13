@@ -515,6 +515,8 @@ struct dl_rq {
 	 * and decreased when a task blocks 
 	 */
 	u64 running_bw;
+
+	s64 this_bw;
 };
 
 #ifdef CONFIG_SMP
