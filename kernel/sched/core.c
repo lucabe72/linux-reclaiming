@@ -5698,6 +5698,11 @@ static int init_rootdomain(struct root_domain *rd)
 {
 	memset(rd, 0, sizeof(*rd));
 
+#ifdef CONFIG_PARALLEL_RECLAIMING
+	rd->max_bw = (7 << 20) / 10;;	// FIXME: Check this... 70%???
+	raw_spin_lock_init(&rd->running_bw_lock);
+#endif
+
 	if (!zalloc_cpumask_var(&rd->span, GFP_KERNEL))
 		goto out;
 	if (!zalloc_cpumask_var(&rd->online, GFP_KERNEL))
