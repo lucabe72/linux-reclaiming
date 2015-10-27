@@ -45,6 +45,38 @@ static inline int on_dl_rq(struct sched_dl_entity *dl_se)
 	return !RB_EMPTY_NODE(&dl_se->rb_node);
 }
 
+#ifdef CONFIG_PARALLEL_RECLAIMING
+static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	struct rq *rq = rq_of_dl_rq(dl_rq);
+	u64 se_bw = dl_se->dl_bw;
+
+	raw_spin_lock(&rq->rd->running_bw_lock);
+	rq->rd->running_bw += se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
+}
+
+static void sub_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	struct rq *rq = rq_of_dl_rq(dl_rq);
+	u64 se_bw = dl_se->dl_bw;
+
+	raw_spin_lock(&rq->rd->running_bw_lock);
+	rq->rd->running_bw -= se_bw;
+	raw_spin_unlock(&rq->rd->running_bw_lock);
+	WARN_ON(rq->rd->running_bw < 0);
+	if (rq->rd->running_bw < 0)
+		rq->rd->running_bw = 0;
+}
+
+static void sub_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+}
+#else
 static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
 	u64 se_bw = dl_se->dl_bw;
@@ -83,6 +115,7 @@ static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 
 	dl_rq->this_bw += se_bw;
 }
+#endif
 
 static void task_go_inactive(struct task_struct *p)
 {
@@ -178,10 +211,12 @@ void init_dl_rq(struct dl_rq *dl_rq)
 #else
 	init_dl_bw(&dl_rq->dl_bw);
 #endif
+#ifndef CONFIG_PARALLEL_RECLAIMING
 	if (global_rt_runtime() == RUNTIME_INF)
 		dl_rq->non_deadline_bw = 0;
 	else
 		dl_rq->non_deadline_bw = (1 << 20) - to_ratio(global_rt_period(), global_rt_runtime());
+#endif
 }
 
 #ifdef CONFIG_SMP
@@ -822,6 +857,22 @@ int dl_runtime_exceeded(struct sched_dl_entity *dl_se)
 
 extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
 
+#ifdef CONFIG_PARALLEL_RECLAIMING
+u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
+{
+	struct root_domain *rd = rq->rd;
+	u64 delta_exec1, delta_exec2;
+	unsigned int m = cpumask_weight(rd->span);
+
+	delta_exec1 = (delta * u) >> 20;
+	delta_exec2 = (delta *
+		div64_long(rd->running_bw + (m - 1) * rd->max_bw, m)) >> 20;
+	if (delta_exec1 > delta_exec2)
+		return delta_exec2;
+
+	return delta_exec1;
+}
+#else
 /*
  * This function implements the GRUB accounting rule:
  * according to the GRUB reclaiming algorithm, the runtime is
@@ -844,6 +895,7 @@ u64 grub_reclaim(u64 delta, struct rq *rq, u64 u)
 
 	return (delta * u_act) >> 20;
 }
+#endif
 
 /*
  * Update the current task's runtime statistics (provided it is still
@@ -1248,6 +1300,7 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 	}
 	rcu_read_unlock();
 
+#ifndef CONFIG_PARALLEL_RECLAIMING
 	if (rq != cpu_rq(cpu)) {
 		int migrate_active;
 
@@ -1266,7 +1319,7 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 			add_running_bw(&p->dl, &rq->dl);
 		raw_spin_unlock(&rq->lock);
 	}
-
+#endif
 
 out:
 	return cpu;
@@ -1728,11 +1781,15 @@ retry:
 	}
 
 	deactivate_task(rq, next_task, 0);
+#ifndef CONFIG_PARALLEL_RECLAIMING
 	sub_running_bw(&next_task->dl, &rq->dl);
 	sub_rq_bw(&next_task->dl, &rq->dl);
+#endif
 	set_task_cpu(next_task, later_rq->cpu);
+#ifndef CONFIG_PARALLEL_RECLAIMING
 	add_rq_bw(&next_task->dl, &later_rq->dl);
 	add_running_bw(&next_task->dl, &later_rq->dl);
+#endif
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
 
@@ -1820,11 +1877,15 @@ static void pull_dl_task(struct rq *this_rq)
 			resched = true;
 
 			deactivate_task(src_rq, p, 0);
+#ifndef CONFIG_PARALLEL_RECLAIMING
 			sub_running_bw(&p->dl, &src_rq->dl);
 			sub_rq_bw(&p->dl, &src_rq->dl);
+#endif
 			set_task_cpu(p, this_cpu);
+#ifndef CONFIG_PARALLEL_RECLAIMING
 			add_rq_bw(&p->dl, &this_rq->dl);
 			add_running_bw(&p->dl, &this_rq->dl);
+#endif
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
 
