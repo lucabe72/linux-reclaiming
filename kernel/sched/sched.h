@@ -510,6 +510,7 @@ struct dl_rq {
 #else
 	struct dl_bw dl_bw;
 #endif
+#ifndef CONFIG_PARALLEL_RECLAIMING
 	/* This is the "active utilization" for this runqueue.
 	 * Increased when a task wakes up (becomes TASK_RUNNING) 
 	 * and decreased when a task blocks 
@@ -521,6 +522,7 @@ struct dl_rq {
 	s64 unusable_bw;
 
 	s64 this_bw;
+#endif
 };
 
 #ifdef CONFIG_SMP
@@ -558,6 +560,17 @@ struct root_domain {
 	 */
 	cpumask_var_t rto_mask;
 	struct cpupri cpupri;
+#ifdef CONFIG_PARALLEL_RECLAIMING
+	/* This is GRUB's "system utilization" for this domain (global
+         * utilization) ...
+	 * Increased when a task passes from "Inactive" to "Active Contending"
+	 * and decreased when a task passes from "Active non Contending" to
+	 * "Inactive"
+	 */
+	s32 running_bw;
+	raw_spinlock_t running_bw_lock;
+	s32 max_bw;
+#endif
 };
 
 extern struct root_domain def_root_domain;
