@@ -549,22 +549,28 @@ static inline int atomic_dec_if_positive(atomic_t *v)
 #endif
 
 /**
- * fetch_or - perform *ptr |= mask and return old value of *ptr
- * @ptr: pointer to value
+ * xchg_or - perform *ptr |= mask atomically and return old value of *ptr
+ * @ptr: pointer to value (cmpxchg() compatible integer pointer type)
  * @mask: mask to OR on the value
  *
- * cmpxchg based fetch_or, macro so it works for different integer types
+ * cmpxchg() based, it's a macro so it works for different integer types.
  */
-#ifndef fetch_or
-#define fetch_or(ptr, mask)						\
-({	typeof(*(ptr)) __old, __val = *(ptr);				\
+#ifndef xchg_or
+# define xchg_or(ptr, mask)						\
+({									\
+	typeof(ptr)  _ptr  = (ptr);					\
+	typeof(mask) _mask = (mask);					\
+									\
+	typeof(*_ptr) _old, _val = *_ptr;				\
+									\
 	for (;;) {							\
-		__old = cmpxchg((ptr), __val, __val | (mask));		\
-		if (__old == __val)					\
+		_old = cmpxchg(_ptr, _val, _val | _mask);		\
+		if (_old == _val)					\
 			break;						\
-		__val = __old;						\
+		_val = _old;						\
 	}								\
-	__old;								\
+									\
+	_old;								\
 })
 #endif
 
