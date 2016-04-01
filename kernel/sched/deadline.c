@@ -52,6 +52,8 @@ static void add_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	lockdep_assert_held(&(rq_of_dl_rq(dl_rq))->lock);
 	dl_rq->running_bw += se_bw;
 	trace_sched_stat_running_bw_add(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
+	if (WARN_ON(dl_rq->running_bw > dl_rq->this_bw))
+		dl_rq->running_bw = dl_rq->this_bw;
 }
 
 static void sub_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
@@ -63,6 +65,23 @@ static void sub_running_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 	trace_sched_stat_running_bw_clear(dl_task_of(dl_se), se_bw, dl_rq->running_bw);
 	if (WARN_ON(dl_rq->running_bw < 0))
 		dl_rq->running_bw = 0;
+}
+
+static void sub_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw -= se_bw;
+	WARN_ON(dl_rq->this_bw < 0);
+	if (dl_rq->this_bw < 0)
+		dl_rq->this_bw = 0;
+}
+
+static void add_rq_bw(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
+{
+	u64 se_bw = dl_se->dl_bw;
+
+	dl_rq->this_bw += se_bw;
 }
 
 static void task_go_inactive(struct task_struct *p)
@@ -109,6 +128,7 @@ static void task_go_inactive(struct task_struct *p)
 			__dl_clear(dl_b, p->dl.dl_bw);
 			__dl_clear_params(p);
 			raw_spin_unlock(&dl_b->lock);
+			sub_rq_bw(&p->dl, &rq->dl);
 		}
 
 		return;
@@ -884,6 +904,7 @@ static enum hrtimer_restart inactive_task_timer(struct hrtimer *timer)
 		__dl_clear(dl_b, p->dl.dl_bw);
 		__dl_clear_params(p);
 		raw_spin_unlock(&dl_b->lock);
+		sub_rq_bw(&p->dl, &rq->dl);
 
 		goto unlock;
 	}
@@ -1192,13 +1213,14 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 		if (migrate_active) {
 			sub_running_bw(&p->dl, &rq->dl);
 		}
+		sub_rq_bw(&p->dl, &rq->dl);
 		raw_spin_unlock(&rq->lock);
-		if (migrate_active) {
-			rq = cpu_rq(cpu);
-			raw_spin_lock(&rq->lock);
+		rq = cpu_rq(cpu);
+		raw_spin_lock(&rq->lock);
+		add_rq_bw(&p->dl, &rq->dl);
+		if (migrate_active)
 			add_running_bw(&p->dl, &rq->dl);
-			raw_spin_unlock(&rq->lock);
-		}
+		raw_spin_unlock(&rq->lock);
 	}
 
 
@@ -1663,7 +1685,9 @@ retry:
 
 	deactivate_task(rq, next_task, 0);
 	sub_running_bw(&next_task->dl, &rq->dl);
+	sub_rq_bw(&next_task->dl, &rq->dl);
 	set_task_cpu(next_task, later_rq->cpu);
+	add_rq_bw(&next_task->dl, &later_rq->dl);
 	add_running_bw(&next_task->dl, &later_rq->dl);
 	activate_task(later_rq, next_task, 0);
 	ret = 1;
@@ -1753,7 +1777,9 @@ static void pull_dl_task(struct rq *this_rq)
 
 			deactivate_task(src_rq, p, 0);
 			sub_running_bw(&p->dl, &src_rq->dl);
+			sub_rq_bw(&p->dl, &src_rq->dl);
 			set_task_cpu(p, this_cpu);
+			add_rq_bw(&p->dl, &this_rq->dl);
 			add_running_bw(&p->dl, &this_rq->dl);
 			activate_task(this_rq, p, 0);
 			dmin = p->dl.deadline;
@@ -1867,8 +1893,10 @@ static void switched_from_dl(struct rq *rq, struct task_struct *p)
 	 * at the 0-lag time, because the task could have been migrated
 	 * while SCHED_OTHER in the meanwhile.
 	 */
-	if (hrtimer_active(&p->dl.inactive_timer) && !hrtimer_callback_running(&p->dl.inactive_timer))
+	if (hrtimer_active(&p->dl.inactive_timer) && !hrtimer_callback_running(&p->dl.inactive_timer)) {
 		sub_running_bw(&p->dl, &rq->dl);
+		sub_rq_bw(&p->dl, &rq->dl);
+	}
 
 	/*
 	 * Since this might be the only -deadline task on the rq,
@@ -1889,6 +1917,7 @@ static void switched_to_dl(struct rq *rq, struct task_struct *p)
 {
 	if (dl_time_before(p->dl.deadline, rq_clock(rq)))
 		setup_new_dl_entity(&p->dl, &p->dl);
+	add_rq_bw(&p->dl, &rq->dl);
 	add_running_bw(&p->dl, &rq->dl);
 
 	if (task_on_rq_queued(p) && rq->curr != p) {
